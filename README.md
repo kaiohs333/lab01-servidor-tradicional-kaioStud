@@ -26,7 +26,7 @@ Este projeto implementa um servidor de aplicação monolítico tradicional para 
 * **Banco de Dados:** SQLite 3
 * **Autenticação:** JWT (jsonwebtoken), bcryptjs
 * **Segurança:** Helmet, express-rate-limit
-* **Outras Ferramentas:** Nodemon, Pino (Logger), Joi (Validação), Node-Cache
+* **Outras Ferramentas:** Nodemon, Pino (Logger), Joi (Validação), Node-Cache, Artillery (Testes)
 
 ---
 
@@ -38,20 +38,9 @@ Este projeto implementa um servidor de aplicação monolítico tradicional para 
 
 ### Passos para Instalação
 
-1.  Clone o repositório:
-    ```bash
-    git clone <url-do-seu-repositorio>
-    ```
-
-2.  Navegue até a pasta do projeto:
-    ```bash
-    cd <nome-da-pasta>
-    ```
-
-3.  Instale as dependências:
-    ```bash
-    npm install
-    ```
+1.  Clone este repositório.
+2.  Navegue até a pasta do projeto.
+3.  Instale as dependências: `npm install`
 
 ### Executando o Servidor
 
@@ -64,7 +53,6 @@ Este projeto implementa um servidor de aplicação monolítico tradicional para 
     ```bash
     npm start
     ```
-
 O servidor estará disponível em `http://localhost:3000`.
 
 ---
@@ -146,3 +134,34 @@ Deleta uma tarefa.
 #### `GET /api/tasks/stats/summary`
 Retorna estatísticas sobre as tarefas do usuário.
 * **Requer Autenticação:** Sim
+
+---
+
+## Análise da Arquitetura e Performance
+
+A análise a seguir resume as características e limitações da arquitetura monolítica implementada, com base na teoria de sistemas distribuídos e nos resultados de um teste de estresse realizado com a ferramenta Artillery.
+
+### Performance: Onde estão os possíveis gargalos do sistema?
+
+O teste de estresse revelou que o sistema não suporta alta carga, com o **banco de dados SQLite** sendo o principal gargalo. O acesso concorrente ao arquivo do banco causa longos tempos de resposta e timeouts. Outros gargalos incluem operações de uso intensivo de CPU (como `bcrypt`) e o consumo de memória pelo cache.
+
+### Escalabilidade: Como esta arquitetura se comportaria com 1000 usuários simultâneos?
+
+A arquitetura falharia completamente. O teste com 300 usuários virtuais já causou a falha do sistema. Com 1000 usuários, o gargalo no banco de dados e a natureza single-threaded do Node.js levariam à indisponibilidade total do serviço. A única opção de escalabilidade é a vertical (mais hardware), que é limitada e cara.
+
+### Disponibilidade: Quais são os pontos de falha identificados?
+
+O sistema possui dois Pontos Únicos de Falha (SPOF):
+* **O Processo do Servidor:** Se a aplicação Node.js travar, o serviço todo fica indisponível.
+* **O Banco de Dados:** Uma falha ou corrupção no arquivo `tasks.db` paralisa todo o sistema.
+
+### Manutenção: Como seria o processo de atualização em produção?
+
+A atualização exige **downtime**. O processo consiste em parar o servidor, substituir os arquivos de código e reiniciar o serviço. Durante este período, a aplicação fica totalmente indisponível para os usuários.
+
+### Evolução: Que mudanças seriam necessárias para suportar múltiplas regiões?
+
+A arquitetura atual é inadequada para operar em múltiplas regiões. Seriam necessárias mudanças drásticas:
+* **Múltiplas Instâncias da Aplicação:** Uma em cada região.
+* **Balanceador de Carga Global:** Para direcionar o tráfego para a instância mais próxima do usuário.
+* **Banco de Dados Distribuído:** Substituir o SQLite por um sistema que suporte replicação de dados entre as regiões para garantir consistência e performance.

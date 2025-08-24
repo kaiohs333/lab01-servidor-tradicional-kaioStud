@@ -1,0 +1,3 @@
+node_modules
+database/tasks.db
+.env

@@ -1,0 +1,30 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    # Gera 10 "usuários virtuais" por segundo durante 30 segundos.
+    # Isso vai gerar um total de 300 logins e 3000 requisições de tarefas.
+    # O userLimiter está configurado para 500 reqs/10min, então ele será ativado.
+    - duration: 30
+      arrivalRate: 10
+scenarios:
+  - name: "Login e listagem de tarefas em loop"
+    flow:
+      # 1. Primeiro, faz login para obter o token JWT
+      - post:
+          url: "/api/auth/login"
+          json:
+            identifier: "stresstest@example.com"
+            password: "password123"
+          # 2. Captura o token da resposta para usar depois
+          capture:
+            - json: "$.data.token"
+              as: "token"
+
+      # 3. Faz um loop de 10 requisições para a lista de tarefas
+      - loop:
+        - get:
+            url: "/api/tasks"
+            # 4. Usa o token capturado no cabeçalho de autorização
+            headers:
+              Authorization: "Bearer {{ token }}"
+        count: 10
